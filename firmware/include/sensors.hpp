@@ -1,10 +1,8 @@
 #pragma once
 
-struct SensorReadings {
-    float rf_power_dbm;
-    float battery_v;
-    float temp_c;
-};
+#include "telemetry.hpp"
 
 void init_sensors();
-SensorReadings read_sensors();
+
+HealthStatus read_health_status(uint32_t now_ms);
+GpsStatus read_gps_status(uint32_t now_ms);

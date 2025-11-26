@@ -12,7 +12,12 @@ add_executable(ol_rf_mesh
     src/adc.cpp
     src/sensors.cpp
     src/mesh.cpp
+    src/mesh_encode.cpp
+    src/crypto.cpp
+    src/ota.cpp
+    src/fault.cpp
     src/model_inference.cpp
+    src/tasks.cpp
 )
 
 target_include_directories(ol_rf_mesh PRIVATE include)
