@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: mesh
+      POSTGRES_PASSWORD: mesh
+      POSTGRES_DB: mesh
+    ports:
+      - "5432:5432"
+    volumes:
+      - mesh_db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql://mesh:mesh@db:5432/mesh
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  ai-worker:
+    build:
+      context: ../ai
+    command: sh -c "python scripts/generate_synthetic_data.py && python scripts/train_baseline_model.py"
+    volumes:
+      - ai_data:/app/data
+      - ai_models:/app/models
+
+  dashboard:
+    build:
+      context: ../dashboard
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+
+volumes:
+  mesh_db_data:
+  ai_data:
+  ai_models:
