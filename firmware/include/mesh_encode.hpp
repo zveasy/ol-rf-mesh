@@ -20,3 +20,4 @@ struct EncryptedFrame {
 
 EncodedFrame encode_mesh_frame(const MeshFrame& frame);
 EncryptedFrame encrypt_mesh_frame(const MeshFrame& frame, const AesGcmKey& key);
+bool decode_mesh_frame(const EncryptedFrame& enc, const AesGcmKey& key, MeshFrame& out);

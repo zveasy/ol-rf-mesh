@@ -1,7 +1,7 @@
 import os
 
-# Default targets the compose db service; falls back to localhost for direct runs.
-DEFAULT_DATABASE_URL = "postgresql://mesh:mesh@db:5432/mesh"
+# Default keeps local development simple (SQLite file). Override for Postgres/Timescale.
+DEFAULT_DATABASE_URL = "sqlite:///backend.db"
 
 
 def get_database_url() -> str:

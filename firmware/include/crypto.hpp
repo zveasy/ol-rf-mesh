@@ -25,3 +25,14 @@ AesGcmResult aes_gcm_encrypt(const uint8_t* plaintext,
                              std::size_t max_ciphertext_len,
                              uint8_t* auth_tag,
                              std::size_t auth_tag_len);
+
+// Decrypts `ciphertext` into `plaintext`, ignoring authentication for now (stub).
+AesGcmResult aes_gcm_decrypt(const uint8_t* ciphertext,
+                             std::size_t ciphertext_len,
+                             const AesGcmKey& key,
+                             const uint8_t* nonce,
+                             std::size_t nonce_len,
+                             const uint8_t* auth_tag,
+                             std::size_t auth_tag_len,
+                             uint8_t* plaintext,
+                             std::size_t max_plaintext_len);

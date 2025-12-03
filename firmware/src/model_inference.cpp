@@ -1,5 +1,6 @@
 #include "model_inference.hpp"
 #include <algorithm>
+#include <cmath>
 #include <complex>
 #include <numeric>
 #include <vector>

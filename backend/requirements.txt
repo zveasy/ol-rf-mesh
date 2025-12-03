@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlalchemy>=2.0.0
+psycopg2-binary
+pytest
+httpx
+alembic
+prometheus-client
+structlog

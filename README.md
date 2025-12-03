@@ -19,5 +19,7 @@ This repo is organized as a monorepo:
 
 ## Quick start
 
-- Backend (FastAPI): `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`, then verify with `curl http://127.0.0.1:8000/health` → expect 200 and `{"status":"ok"}`.
+- Backend (FastAPI): `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload`, then verify with `curl http://127.0.0.1:8000/health` → expect 200 and `{"status":"ok"}`. Smoke test with `python -m pytest -q`. Mock data lives at `/mock/nodes` and `/mock/events` for early UI tests.
+- Firmware (host build): `cd firmware && cmake -S . -B build && cmake --build build && cd build && ctest -V` to compile the scaffold and run two tiny unit tests.
+- Dashboard (Vite/React): `cd dashboard && npm install && npm run dev` for local dev, or `npm run build` to confirm production bundle.
 - AI scripts: `cd ai && source .venv/bin/activate && python scripts/generate_synthetic_data.py && python scripts/train_baseline_model.py`; check `data/raw/` for `.npy` outputs and `models/rf_baseline.joblib` for the trained model. If editable install fails, simply `pip install numpy scikit-learn joblib` in that venv.

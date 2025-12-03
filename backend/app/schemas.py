@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
+from pydantic import Field
 
 
 class TelemetryIn(BaseModel):
@@ -71,6 +72,17 @@ class RfEventIn(BaseModel):
     bin_width_hz: float
     anomaly_score: float
     features: List[float]
+
+
+class SpectrumPoint(BaseModel):
+    freq_hz: float
+    power_dbm: float
+
+
+class SpectrumSnapshot(BaseModel):
+    band_id: str
+    captured_at: datetime
+    points: List[SpectrumPoint] = Field(default_factory=list)
 
 
 class GpsQualityIn(BaseModel):

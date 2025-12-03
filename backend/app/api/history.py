@@ -1,24 +1,25 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
 from ..schemas import PaginatedGps, PaginatedRfEvents, Rollup
 from .. import db
+from ..auth import require_token
 
 router = APIRouter()
 
 
-@router.get("/rf-events", response_model=PaginatedRfEvents)
+@router.get("/rf-events", response_model=PaginatedRfEvents, dependencies=[Depends(require_token)])
 async def list_rf_events(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)) -> PaginatedRfEvents:
     events, total = db.list_rf_events(limit=limit, offset=offset)
     return PaginatedRfEvents(items=events, total=total, limit=limit, offset=offset)
 
 
-@router.get("/gps", response_model=PaginatedGps)
+@router.get("/gps", response_model=PaginatedGps, dependencies=[Depends(require_token)])
 async def list_gps_logs(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)) -> PaginatedGps:
     samples, total = db.list_gps_logs(limit=limit, offset=offset)
     return PaginatedGps(items=samples, total=total, limit=limit, offset=offset)
 
 
-@router.get("/rollups", response_model=list[Rollup])
+@router.get("/rollups", response_model=list[Rollup], dependencies=[Depends(require_token)])
 async def get_rollups() -> list[Rollup]:
     rows = db.list_rollups()
     return [

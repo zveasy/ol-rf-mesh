@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException
@@ -20,9 +20,9 @@ async def register_node(node: NodeCreate) -> Node:
         raise HTTPException(status_code=409, detail="Node already registered")
 
     created = Node(
-        **node.dict(),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        **node.model_dump(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     state.NODES[node.node_id] = created
     db.insert_node(created)
@@ -32,7 +32,7 @@ async def register_node(node: NodeCreate) -> Node:
         node.node_id,
         NodeStatus(
             node_id=node.node_id,
-            last_seen=datetime.utcnow(),
+            last_seen=datetime.now(UTC),
             battery_v=0.0,
             rf_power_dbm=0.0,
             temp_c=0.0,

@@ -1,17 +1,32 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 
-from ..schemas import GpsQualityIn, NodeStatus, RfEventIn, TelemetryIn, AlertIn
+from ..schemas import GpsQualityIn, NodeStatus, RfEventIn, TelemetryIn, AlertIn, SpectrumSnapshot, SpectrumPoint
 from .. import state, db
 from .ws import manager
 from .alerts import store_and_broadcast_alert
+from ..auth import require_token, API_TOKEN
+from ..state import SPECTRUM_BY_BAND
+from .. import db
 
 router = APIRouter()
 
 
-@router.post("/")
+def _update_spectrum(event: RfEventIn) -> None:
+    # Convert feature list to a simple spectrum around center_freq_hz with bin_width_hz spacing.
+    points = []
+    start_freq = event.center_freq_hz - (len(event.features) // 2) * event.bin_width_hz
+    for idx, power in enumerate(event.features):
+        freq = start_freq + idx * event.bin_width_hz
+        points.append(SpectrumPoint(freq_hz=freq, power_dbm=power))
+    snapshot = SpectrumSnapshot(band_id=event.band_id, captured_at=event.timestamp, points=points)
+    SPECTRUM_BY_BAND[event.band_id] = snapshot
+    db.insert_spectrum(snapshot)
+
+
+@router.post("/", dependencies=[Depends(require_token)])
 async def ingest_telemetry(data: TelemetryIn):
     """Legacy single-sample telemetry endpoint.
 
@@ -25,6 +40,17 @@ async def ingest_telemetry(data: TelemetryIn):
             band_id="legacy",
             center_freq_hz=0.0,
             bin_width_hz=0.0,
+            anomaly_score=data.anomaly_score,
+            features=[data.rf_power_dbm],
+        )
+    )
+    _update_spectrum(
+        RfEventIn(
+            node_id=data.node_id,
+            timestamp=datetime.utcfromtimestamp(data.timestamp),
+            band_id="legacy",
+            center_freq_hz=0.0,
+            bin_width_hz=1.0,
             anomaly_score=data.anomaly_score,
             features=[data.rf_power_dbm],
         )
@@ -66,7 +92,7 @@ async def ingest_telemetry(data: TelemetryIn):
     return {"status": "ok"}
 
 
-@router.post("/rf-events")
+@router.post("/rf-events", dependencies=[Depends(require_token)])
 async def ingest_rf_events(events: List[RfEventIn]):
     """Batch RF event ingestion endpoint.
 
@@ -76,6 +102,7 @@ async def ingest_rf_events(events: List[RfEventIn]):
     for e in events:
         state.RF_EVENTS.append(e)
         db.insert_rf_event(e)
+        _update_spectrum(e)
 
         prev = state.NODE_STATUS.get(e.node_id)
         state.NODE_STATUS[e.node_id] = NodeStatus(
@@ -105,7 +132,7 @@ async def ingest_rf_events(events: List[RfEventIn]):
     return {"accepted": len(events)}
 
 
-@router.post("/gps")
+@router.post("/gps", dependencies=[Depends(require_token)])
 async def ingest_gps_quality(samples: List[GpsQualityIn]):
     """Batch GPS quality ingestion endpoint."""
 

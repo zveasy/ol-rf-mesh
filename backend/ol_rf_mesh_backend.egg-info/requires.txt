@@ -1,3 +1,10 @@
 fastapi
 uvicorn[standard]
 pydantic
+sqlalchemy>=2.0.0
+
+[:platform_system != "Windows"]
+psycopg2-binary
+
+[:platform_system == "Windows"]
+psycopg2

@@ -1,16 +1,25 @@
-import os
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from typing import List, Tuple
 
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from .models import Base, NodeModel, RfEventModel, GpsLogModel, AlertModel, NodeRollupModel
-from .schemas import Alert, AlertIn, GpsQualityIn, Node, RfEventIn
+from .models import Base, NodeModel, RfEventModel, GpsLogModel, AlertModel, NodeRollupModel, SpectrumModel
+from .schemas import Alert, AlertIn, GpsQualityIn, Node, RfEventIn, SpectrumSnapshot, SpectrumPoint
+from .config import get_database_url
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///backend.db")
+DATABASE_URL = get_database_url()
 
-engine = create_engine(DATABASE_URL, future=True)
+engine_kwargs = {"future": True}
+
+# SQLite needs thread override for TestClient + background tasks; in-memory gets StaticPool.
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+    if DATABASE_URL.endswith(":memory:"):
+        engine_kwargs["poolclass"] = StaticPool
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
@@ -70,7 +79,7 @@ def insert_gps_log(sample: GpsQualityIn) -> None:
 
 
 def insert_alert(alert: AlertIn) -> Alert:
-    created_at = alert.created_at or datetime.utcnow()
+    created_at = alert.created_at or datetime.now(UTC)
     with SessionLocal() as session:
         model = AlertModel(
             node_ids_json=alert.node_ids,
@@ -217,3 +226,58 @@ def compute_rollups(now: datetime) -> None:
 def list_rollups() -> List[NodeRollupModel]:
     with SessionLocal() as session:
         return session.query(NodeRollupModel).all()
+
+
+def insert_spectrum(snapshot: SpectrumSnapshot) -> None:
+    with SessionLocal() as session:
+        session.add(
+            SpectrumModel(
+                band_id=snapshot.band_id,
+                captured_at=snapshot.captured_at,
+                points_json=[{"freq_hz": p.freq_hz, "power_dbm": p.power_dbm} for p in snapshot.points],
+            )
+        )
+        session.commit()
+
+
+def list_latest_spectrum() -> List[SpectrumSnapshot]:
+    """Return latest snapshot per band (best-effort)."""
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(SpectrumModel).order_by(SpectrumModel.captured_at.desc()).limit(50)
+        ).scalars().all()
+    seen = set()
+    snapshots: List[SpectrumSnapshot] = []
+    for row in rows:
+        if row.band_id in seen:
+            continue
+        seen.add(row.band_id)
+        snapshots.append(
+            SpectrumSnapshot(
+                band_id=row.band_id,
+                captured_at=row.captured_at,
+                points=[SpectrumPoint(**p) for p in row.points_json],
+            )
+        )
+    return snapshots
+
+
+def list_spectrum_history(band_id: str | None = None, since: datetime | None = None, limit: int = 100, offset: int = 0) -> List[SpectrumSnapshot]:
+    query = select(SpectrumModel)
+    if band_id:
+        query = query.where(SpectrumModel.band_id == band_id)
+    if since:
+        query = query.where(SpectrumModel.captured_at >= since)
+    query = query.order_by(SpectrumModel.captured_at.desc()).limit(limit).offset(offset)
+
+    with SessionLocal() as session:
+        rows = session.execute(query).scalars().all()
+
+    return [
+        SpectrumSnapshot(
+            band_id=row.band_id,
+            captured_at=row.captured_at,
+            points=[SpectrumPoint(**p) for p in row.points_json],
+        )
+        for row in rows
+    ]

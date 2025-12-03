@@ -31,3 +31,19 @@ AesGcmResult aes_gcm_encrypt(const uint8_t* plaintext,
 
     return {true, plaintext_len};
 }
+
+AesGcmResult aes_gcm_decrypt(const uint8_t* ciphertext,
+                             std::size_t ciphertext_len,
+                             const AesGcmKey& /*key*/,
+                             const uint8_t* /*nonce*/,
+                             std::size_t /*nonce_len*/,
+                             const uint8_t* /*auth_tag*/,
+                             std::size_t /*auth_tag_len*/,
+                             uint8_t* plaintext,
+                             std::size_t max_plaintext_len) {
+    if (ciphertext_len > max_plaintext_len) {
+        return {false, 0};
+    }
+    std::memcpy(plaintext, ciphertext, ciphertext_len);
+    return {true, ciphertext_len};
+}

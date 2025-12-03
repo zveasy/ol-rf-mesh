@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 
 from sqlalchemy import Column, Float, Integer, String, Boolean, JSON, DateTime
@@ -17,8 +17,8 @@ class NodeModel(Base):
     lat = Column(Float, nullable=True)
     lon = Column(Float, nullable=True)
     alt = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class RfEventModel(Base):
@@ -56,14 +56,23 @@ class AlertModel(Base):
     type = Column(String, nullable=False)
     severity = Column(String, nullable=False)
     message = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class NodeRollupModel(Base):
     __tablename__ = "node_rollups"
 
     node_id = Column(String, primary_key=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
     rf_events_24h = Column(Integer, default=0)
     avg_anomaly_24h = Column(Float, default=0.0)
     gps_jam_events_24h = Column(Integer, default=0)
+
+
+class SpectrumModel(Base):
+    __tablename__ = "spectrum_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    band_id = Column(String, index=True, nullable=False)
+    captured_at = Column(DateTime, index=True, nullable=False)
+    points_json = Column(JSON, nullable=False)

@@ -34,3 +34,22 @@ Key structs live in `include/telemetry.hpp` (`RFSampleWindow`, `RFEvent`, `GpsSt
 - **Crypto interface**: `crypto.hpp`/`crypto.cpp` introduce an AES-GCM API (stubbed: copies plaintext and hashes into tag). `mesh_encode` wraps frames into `[auth_tag||ciphertext]`.
 - **Mesh key**: `NodeConfig` includes a 32-byte `mesh_key`; nonce/tag are carried in `MeshSecurity` and used during encryption.
 - **Wire-up**: `mesh.cpp` now encrypts encoded frames before send and logs cipher length. Build stays stub-friendly while defining the interfaces for real crypto/TFLM.
+
+## Build + smoke test (host)
+
+```bash
+cd firmware
+cmake -S . -B build
+cmake --build build
+cd build && ctest -V
+```
+
+This config builds against the host toolchain (no MCU SDK needed) and runs two tiny tests:
+
+- `test_model_inference`: validates FFT feature extraction and normalized anomaly score.
+- `test_mesh_routing`: sanity-checks route table capacity and encoding stubs.
+
+Host fuzz/codec test (enabled by default via `ENABLE_FUZZ_TESTS=ON`):
+
+- `test_mesh_codec_fuzz`: rapidly encodes random mesh frames, encrypts them, and ensures outputs stay within bounds. Uses `MockRadio` to accumulate sends.
+- `test_mesh_retry`: simulates packet drops via a mock air queue and asserts delivery with retry attempts.

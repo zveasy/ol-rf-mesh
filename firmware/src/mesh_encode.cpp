@@ -126,3 +126,118 @@ EncryptedFrame encrypt_mesh_frame(const MeshFrame& frame, const AesGcmKey& key) 
 
     return out;
 }
+
+static bool decode_mesh_frame_clear(const EncodedFrame& enc, MeshFrame& frame) {
+    std::size_t idx = 0;
+    auto read_scalar = [&](auto& dst) -> bool {
+        using T = std::decay_t<decltype(dst)>;
+        if (idx + sizeof(T) > enc.len) return false;
+        std::memcpy(&dst, enc.bytes.data() + idx, sizeof(T));
+        idx += sizeof(T);
+        return true;
+    };
+
+    read_scalar(frame.header.version);
+    uint8_t msg_type = 0;
+    read_scalar(msg_type);
+    frame.header.msg_type = static_cast<MeshMsgType>(msg_type);
+    read_scalar(frame.header.ttl);
+    read_scalar(frame.header.hop_count);
+    read_scalar(frame.header.seq_no);
+    if (idx + sizeof(frame.header.src_node_id) + sizeof(frame.header.dest_node_id) > enc.len) return false;
+    std::memcpy(frame.header.src_node_id, enc.bytes.data() + idx, sizeof(frame.header.src_node_id));
+    idx += sizeof(frame.header.src_node_id);
+    std::memcpy(frame.header.dest_node_id, enc.bytes.data() + idx, sizeof(frame.header.dest_node_id));
+    idx += sizeof(frame.header.dest_node_id);
+
+    uint8_t encrypted = 0;
+    read_scalar(encrypted);
+    if (idx + kNonceLength + kAuthTagLength > enc.len) return false;
+    std::memcpy(frame.security.nonce.data(), enc.bytes.data() + idx, kNonceLength);
+    idx += kNonceLength;
+    std::memcpy(frame.security.auth_tag.data(), enc.bytes.data() + idx, kAuthTagLength);
+    idx += kAuthTagLength;
+    frame.security.encrypted = encrypted != 0;
+
+    read_scalar(frame.telemetry.rf_event.timestamp_ms);
+    read_scalar(frame.telemetry.rf_event.center_freq_hz);
+    read_scalar(frame.telemetry.rf_event.features.avg_dbm);
+    read_scalar(frame.telemetry.rf_event.features.peak_dbm);
+    read_scalar(frame.telemetry.rf_event.anomaly_score);
+    read_scalar(frame.telemetry.rf_event.model_version);
+
+    read_scalar(frame.telemetry.gps.timestamp_ms);
+    read_scalar(frame.telemetry.gps.latitude_deg);
+    read_scalar(frame.telemetry.gps.longitude_deg);
+    read_scalar(frame.telemetry.gps.altitude_m);
+    read_scalar(frame.telemetry.gps.num_sats);
+    read_scalar(frame.telemetry.gps.hdop);
+    uint8_t valid_fix = 0, jam = 0, spoof = 0;
+    read_scalar(valid_fix);
+    read_scalar(jam);
+    read_scalar(spoof);
+    frame.telemetry.gps.valid_fix = valid_fix != 0;
+    frame.telemetry.gps.jamming_detected = jam != 0;
+    frame.telemetry.gps.spoof_detected = spoof != 0;
+    read_scalar(frame.telemetry.gps.cn0_db_hz_avg);
+
+    read_scalar(frame.telemetry.health.timestamp_ms);
+    read_scalar(frame.telemetry.health.battery_v);
+    read_scalar(frame.telemetry.health.temp_c);
+    read_scalar(frame.telemetry.health.imu_tilt_deg);
+    uint8_t tamper = 0;
+    read_scalar(tamper);
+    frame.telemetry.health.tamper_flag = tamper != 0;
+
+    uint8_t fault_active = 0;
+    read_scalar(fault_active);
+    frame.fault.fault_active = fault_active != 0;
+    read_scalar(frame.fault.counters.watchdog_resets);
+    read_scalar(frame.fault.counters.ota_failures);
+    read_scalar(frame.fault.counters.tamper_events);
+
+    uint8_t ota_state = 0;
+    read_scalar(ota_state);
+    frame.ota.state = static_cast<OtaState>(ota_state);
+    read_scalar(frame.ota.current_offset);
+    read_scalar(frame.ota.total_size);
+    uint8_t ota_sig = 0;
+    read_scalar(ota_sig);
+    frame.ota.signature_valid = ota_sig != 0;
+
+    read_scalar(frame.routing.epoch_ms);
+    uint8_t entry_count = 0;
+    read_scalar(entry_count);
+    frame.routing.entry_count = entry_count;
+    for (std::size_t i = 0; i < frame.routing.entry_count && idx < enc.len; ++i) {
+        if (idx + sizeof(frame.routing.entries[i].neighbor_id) > enc.len) return false;
+        std::memcpy(frame.routing.entries[i].neighbor_id, enc.bytes.data() + idx, sizeof(frame.routing.entries[i].neighbor_id));
+        idx += sizeof(frame.routing.entries[i].neighbor_id);
+        read_scalar(frame.routing.entries[i].rssi_dbm);
+        read_scalar(frame.routing.entries[i].link_quality);
+        read_scalar(frame.routing.entries[i].cost);
+    }
+
+    return true;
+}
+
+bool decode_mesh_frame(const EncryptedFrame& enc, const AesGcmKey& key, MeshFrame& out) {
+    EncodedFrame clear{};
+    clear.len = enc.len > kAuthTagLength ? enc.len - kAuthTagLength : 0;
+    if (clear.len > clear.bytes.size()) return false;
+    // Layout: auth_tag || ciphertext
+    AesGcmResult res = aes_gcm_decrypt(
+        enc.bytes.data() + kAuthTagLength,
+        clear.len,
+        key,
+        nullptr,
+        0,
+        enc.bytes.data(),
+        kAuthTagLength,
+        clear.bytes.data(),
+        clear.bytes.size()
+    );
+    if (!res.ok) return false;
+    clear.len = res.ciphertext_len;
+    return decode_mesh_frame_clear(clear, out);
+}

@@ -1,0 +1,21 @@
+# Build TFLite artifacts in a reproducible container (CPU). Use amd64 for TF wheels.
+FROM --platform=${TARGETPLATFORM:-linux/amd64} python:3.10-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/ai
+
+# Install deps (tensorflow-cpu keeps image lean)
+RUN python -m pip install --upgrade pip
+COPY pyproject.toml ./
+RUN python -m pip install --no-cache-dir numpy scikit-learn joblib tensorflow-cpu==2.15.0
+
+# Copy scripts and data
+COPY scripts ./scripts
+COPY data ./data
+COPY models ./models
+
+# Default command runs full pipeline (IQ -> features -> TFLite export)
+CMD ["/bin/bash", "-c", "python scripts/generate_synthetic_iq.py --samples 50 --fft-size 256 && python scripts/extract_features.py --fft-size 256 --bins 128 && python scripts/train_tflite_baseline.py --epochs 5 --output models/rf_classifier_int8.tflite --header models/rf_classifier_model.h --contract models/model_contract.json && ls -lh models"]

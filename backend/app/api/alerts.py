@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from ..schemas import Alert, AlertIn
 from .ws import manager
 from .. import db
+from ..auth import require_token
 
 router = APIRouter()
 
@@ -25,13 +26,13 @@ async def store_and_broadcast_alert(alert: AlertIn) -> Alert:
     return alert_obj
 
 
-@router.post("/", response_model=Alert)
+@router.post("/", response_model=Alert, dependencies=[Depends(require_token)])
 async def create_alert(alert: AlertIn) -> Alert:
     """Create an alert (from backend logic or an external source)."""
     return await store_and_broadcast_alert(alert)
 
 
-@router.get("/", response_model=List[Alert])
+@router.get("/", response_model=List[Alert], dependencies=[Depends(require_token)])
 async def list_alerts() -> List[Alert]:
     """List recent alerts."""
     return db.recent_alerts()

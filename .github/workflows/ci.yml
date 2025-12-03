@@ -1,0 +1,79 @@
+name: Build and Smoke Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend - pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Run migrations (SQLite)
+        run: alembic upgrade head
+      - name: Run migrations (Postgres)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          alembic upgrade head
+      - name: Show alembic heads (ensure single head)
+        run: alembic heads
+      - name: Alembic current (Postgres)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: alembic current
+      - name: Run pytest
+        run: python -m pytest -q
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+  dashboard:
+    name: Dashboard - build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "dashboard/package-lock.json"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+
+  firmware:
+    name: Firmware - cmake + ctest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S firmware -B firmware/build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build firmware/build
+      - name: CTest
+        run: ctest --test-dir firmware/build --output-on-failure

@@ -60,14 +60,15 @@ This document summarizes the current production-readiness criteria and remaining
 - **Dashboard (React/Next.js)**: Live RF spectrum charts, node health cards, alert list with severity, and GPS interference timeline.
 
 ## Readiness Score & Gaps
-- **Score (0–100): 35/100.** Current repository materials are largely architectural and checklist oriented, with limited implementation assets. No automated tests, firmware source, backend services, or dashboard code are present to validate readiness.
-- **What is needed next:**
-  - **Firmware buildable baseline:** Add FreeRTOS firmware projects with RF front-end drivers, ADC capture, GNSS monitoring, mesh stack, packet codec (CBOR/protobuf), AES-256-GCM, OTA flow, and watchdog coverage. Include unit tests and HIL hooks.
-  - **Mesh protocols and transport:** Implement routing state exchange, link-quality metrics, retry/fragmentation, and time sync. Provide soak/chaos test scenarios for churn and recovery.
-  - **Backend services:** Introduce FastAPI/Go ingest, node registry, health monitor, RF event store, alert engine, and WebSocket feed. Add schemas/migrations and load/latency tests.
-  - **AI pipeline:** Supply preprocessing/FFT extraction code, training artifacts, quantized TFLite Micro model, and on-device inference integration with benchmark results.
-  - **Dashboard:** Add real-time spectrum/FFT visualizations, node health views, alert triage, and GPS interference timelines with mocked and live data paths.
-  - **Automation & ops:** Add CI (lint/test/build), IaC for environments, observability wiring (metrics/logs/traces), and deployment runbooks/field checklists.
+- **Score (0–100): 50/100.** Firmware, backend, and dashboard now build and ship with smoke tests (host CMake+CTest, FastAPI pytest, Vite build). A monorepo CI workflow runs these on every push. Backend exposes health/metrics and mock data for the dashboard; firmware scaffolding exercises routing/inference paths. The core feature set is still skeletal and lacks production hardening, telemetry scale testing, and real RF/ML integration.
+ 
+- **Remaining work to reach the project goal:**
+  - **Firmware baseline:** Target the real MCU + RF front-end with validated drivers, ADC capture, GNSS monitoring, mesh stack integration, packet codec (CBOR/protobuf), AES-256-GCM security, OTA flow, watchdog coverage, and HIL tests around drivers/mesh/OTA/faults.
+  - **Mesh protocols and transport:** Implement routing state exchange, link-quality-based parent selection, retries/fragmentation, and time synchronization across nodes. Run soak/chaos tests to characterize churn, mobility, node loss, and recovery behavior.
+  - **Backend services:** Harden ingest, node registry, alert engine, and WebSocket feeds with schemas/migrations, auth (mTLS/token), load/latency tests, retention/backup, and observability hooks (logs/metrics/traces) against Postgres/Timescale.
+  - **AI pipeline:** Extend the existing synthetic IQ→FFT→int8 TFLite pipeline (generation, feature extraction, training, quantization, contract + latency benchmark) to real RF datasets and on-device integration. Validate model performance on representative RF environments, finalize the TFLM-ready header/contract, and benchmark latency/memory/power on target MCUs.
+  - **Dashboard:** Build real-time spectrum/FFT visualizations, node health + topology views, alert triage flows, and GPS interference timelines, wired to live backend data alongside mocks.
+  - **Operations:** Extend CI to lint/static analysis; add IaC for backend + observability stack, deployment runbooks, field deployment checklist with SLOs and alerting policies.
 
 ## Security Note
 This system is commercial, passive, and unclassified. It must not include any classified data, classified processing, or offensive/weaponized capabilities.
