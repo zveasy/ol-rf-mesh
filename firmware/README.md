@@ -53,3 +53,15 @@ Host fuzz/codec test (enabled by default via `ENABLE_FUZZ_TESTS=ON`):
 
 - `test_mesh_codec_fuzz`: rapidly encodes random mesh frames, encrypts them, and ensures outputs stay within bounds. Uses `MockRadio` to accumulate sends.
 - `test_mesh_retry`: simulates packet drops via a mock air queue and asserts delivery with retry attempts.
+
+## Production build (release-optimized)
+
+Use a clean build directory and a release build type for production firmware images. Fuzz helpers are disabled to minimize binary size; tests can still be run in that build if desired.
+
+```bash
+cd firmware
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DENABLE_FUZZ_TESTS=OFF
+cmake --build build/release --target ol_rf_mesh -j
+# Optional: run tests under the optimized build
+cd build/release && ctest -V
+```

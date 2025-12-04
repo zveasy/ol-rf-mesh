@@ -4,6 +4,21 @@ project(ol_rf_mesh_firmware CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Default to a release-optimized host build unless explicitly overridden.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(DEFAULT_BUILD_TYPE "RelWithDebInfo")
+    message(STATUS "No CMAKE_BUILD_TYPE specified; defaulting to ${DEFAULT_BUILD_TYPE}")
+    set(CMAKE_BUILD_TYPE "${DEFAULT_BUILD_TYPE}" CACHE STRING "Choose the type of build." FORCE)
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Apply consistent warnings; rely on CMake defaults for optimization levels per build type.
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 add_executable(ol_rf_mesh
     src/main.cpp
     src/config.cpp
@@ -75,6 +90,15 @@ add_executable(test_mesh_roundtrip
 )
 target_include_directories(test_mesh_roundtrip PRIVATE include)
 add_test(NAME test_mesh_roundtrip COMMAND test_mesh_roundtrip)
+
+add_executable(test_mesh_security
+    tests/test_mesh_security.cpp
+    src/mesh_encode.cpp
+    src/mesh.cpp
+    src/crypto.cpp
+)
+target_include_directories(test_mesh_security PRIVATE include)
+add_test(NAME test_mesh_security COMMAND test_mesh_security)
 
 add_executable(test_model_contract
     tests/test_model_contract.cpp

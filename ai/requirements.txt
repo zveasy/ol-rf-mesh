@@ -1,3 +1,8 @@
-tensorflow-cpu==2.15.0
+# TensorFlow variant per platform
+# Note: Apple Silicon pip wheels currently top out at 2.14.x.
+tensorflow-macos>=2.14,<2.15; platform_system == "Darwin" and platform_machine == "arm64"
+tensorflow>=2.14,<2.18; platform_system == "Darwin" and platform_machine == "x86_64"
+tensorflow-cpu>=2.14,<2.18; platform_system != "Darwin"
+
 numpy
 scikit-learn

@@ -16,6 +16,8 @@ struct AesGcmResult {
 };
 
 // Encrypts `plaintext` into `ciphertext`, writes tag into `auth_tag`.
+// Note: this is a software fallback that provides basic confidentiality +
+// integrity for host tests. On target hardware, replace with platform AES-GCM.
 AesGcmResult aes_gcm_encrypt(const uint8_t* plaintext,
                              std::size_t plaintext_len,
                              const AesGcmKey& key,

@@ -20,14 +20,23 @@ cd ai
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt  # tensorflow-cpu + numpy/sklearn
 
-# 1) Generate synthetic IQ (multi-band, anomalies)
-python scripts/generate_synthetic_iq.py --samples 50 --fft-size 256
+# 1) Generate IQ (use --samples for synthetic, or drop a real capture at data/iq/iq_samples.npz)
+  python scripts/generate_synthetic_iq.py --samples 50 --fft-size 256
 
-# 2) Extract log-magnitude FFT features
-python scripts/extract_features.py --fft-size 256 --bins 128
+# 2) Extract log-magnitude FFT features (or point to your real IQ npz)
+python scripts/extract_features.py --fft-size 256 --bins 128 --iq-path data/iq/iq_samples.npz
 
 # 3) Train + quantize baseline classifier, emit TFLite/TFLM + contract
-python scripts/train_tflite_baseline.py --epochs 5 --output models/rf_classifier_int8.tflite --header models/rf_classifier_model.h --contract models/model_contract.json
+python scripts/train_tflite_baseline.py \
+  --epochs 5 \
+  --output models/rf_classifier_int8.tflite \
+  --header models/rf_classifier_model.h \
+  --contract models/model_contract.json \
+  --features-path data/processed/features.npz \
+  --dataset-version real-rf-v1
+
+Notes:
+- On Apple Silicon, `pip install -r requirements.txt` will pull `tensorflow-macos` (2.14.x); optionally add `pip install tensorflow-metal` for GPU acceleration.
 ```
 
 Artifacts:
@@ -35,7 +44,7 @@ Artifacts:
 - `data/processed/features.npz`: log-magnitude FFT features + labels.
 - `models/rf_classifier_int8.tflite`: int8 quantized classifier.
 - `models/rf_classifier_model.h`: C array + tensor arena hint.
-- `models/model_contract.json`: on-device API contract (input shape, quantization, threshold).
+- `models/model_contract.json`: on-device API contract (input shape, quantization, threshold, feature stats + dataset version).
 
 Benchmark: `train_tflite_baseline.py` reports avg int8 inference latency on host CPU.
 

@@ -57,9 +57,12 @@ logger = logging.getLogger("ol_rf_mesh")
 
 app = FastAPI(title="O&L RF Mesh Backend", lifespan=lifespan)
 
+allowed_origins = os.getenv("BACKEND_CORS_ORIGINS", "*")
+cors_origins = ["*"] if allowed_origins.strip() == "*" else [o.strip() for o in allowed_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

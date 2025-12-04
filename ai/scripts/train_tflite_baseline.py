@@ -26,14 +26,31 @@ MODELS = pathlib.Path("models")
 MODELS.mkdir(exist_ok=True)
 
 
-def load_features(fft_size: int, bins: int) -> Tuple[np.ndarray, np.ndarray]:
-    if PROCESSED.exists():
-        data = np.load(PROCESSED)
-        return data["X"], data["y"]
+def load_features(fft_size: int, bins: int, features_path: pathlib.Path, iq_path: pathlib.Path | None) -> Tuple[np.ndarray, np.ndarray, dict]:
+    """Load features from disk (real capture or synthetic fallback)."""
+    meta: dict = {}
+    if features_path.exists():
+        data = np.load(features_path)
+        meta["source"] = str(features_path)
+        meta["fft_size"] = int(data.get("fft_size", fft_size))
+        meta["bins"] = int(data.get("bins", bins))
+        meta["iq_path"] = data.get("iq_path", None)
+        return data["X"], data["y"], meta
+
+    if iq_path and iq_path.exists():
+        iq, labels, _, fft_size_loaded = load_iq(fft_size, iq_path)
+        feats = iq_to_features(iq, bins)
+        meta["source"] = str(iq_path)
+        meta["fft_size"] = fft_size_loaded
+        meta["bins"] = bins
+        return feats, labels, meta
 
     iq, labels, _, _ = load_iq(fft_size)
     feats = iq_to_features(iq, bins)
-    return feats, labels
+    meta["source"] = "synthetic_fallback"
+    meta["fft_size"] = fft_size
+    meta["bins"] = bins
+    return feats, labels, meta
 
 
 def build_model(input_dim: int) -> tf.keras.Model:
@@ -127,6 +144,10 @@ def build_contract(path: pathlib.Path, meta: dict, threshold: float, fft_size: i
         "fft_size": fft_size,
         "feature_bins": bins,
         "feature": "log-magnitude FFT, normalized per window",
+        "feature_mean": meta.get("feature_mean"),
+        "feature_std": meta.get("feature_std"),
+        "dataset_version": meta.get("dataset_version", "unknown"),
+        "dataset_source": meta.get("dataset_source"),
         "threshold": threshold,
         "decision": "output > threshold => anomaly",
     }
@@ -143,9 +164,17 @@ def main():
     parser.add_argument("--output", type=str, default="models/rf_classifier_int8.tflite")
     parser.add_argument("--header", type=str, default="models/rf_classifier_model.h")
     parser.add_argument("--contract", type=str, default="models/model_contract.json")
+    parser.add_argument("--features-path", type=str, default=str(PROCESSED), help="Pre-extracted features npz (real or synthetic).")
+    parser.add_argument("--iq-path", type=str, default=str(pathlib.Path("data/iq/iq_samples.npz")), help="Raw IQ npz (real capture).")
+    parser.add_argument("--dataset-version", type=str, default="synthetic-v1", help="Semantic version/ID for the dataset used.")
     args = parser.parse_args()
 
-    X, y = load_features(args.fft_size, args.bins)
+    features_path = pathlib.Path(args.features_path)
+    iq_path = pathlib.Path(args.iq_path) if args.iq_path else None
+    X, y, ds_meta = load_features(args.fft_size, args.bins, features_path, iq_path)
+    feature_mean = X.mean(axis=0)
+    feature_std = X.std(axis=0) + 1e-6
+
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     model = build_model(X.shape[1])
@@ -167,7 +196,23 @@ def main():
     print(f"TFLite int8 latency: {latency_ms:.3f} ms (avg over 100 runs)")
 
     contract_path = pathlib.Path(args.contract)
-    build_contract(contract_path, meta, threshold, args.fft_size, args.bins)
+    meta.update(
+        {
+            "feature_mean": feature_mean.tolist(),
+            "feature_std": feature_std.tolist(),
+            "dataset_version": args.dataset_version,
+            "dataset_source": ds_meta.get("source"),
+            "fft_size": ds_meta.get("fft_size", args.fft_size),
+            "feature_bins": ds_meta.get("bins", args.bins),
+        }
+    )
+    build_contract(
+        contract_path,
+        meta,
+        threshold,
+        fft_size=ds_meta.get("fft_size", args.fft_size),
+        bins=ds_meta.get("bins", args.bins),
+    )
 
 
 if __name__ == "__main__":

@@ -21,9 +21,9 @@ PROCESSED.mkdir(parents=True, exist_ok=True)
 IQ_PATH = pathlib.Path("data/iq/iq_samples.npz")
 
 
-def load_iq(fallback_fft: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int]:
-    if IQ_PATH.exists():
-        data = np.load(IQ_PATH)
+def load_iq(fallback_fft: int, iq_path: pathlib.Path = IQ_PATH) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    if iq_path.exists():
+        data = np.load(iq_path)
         fft_size = int(data.get("fft_size", fallback_fft))
         iq = data["iq_real"] + 1j * data["iq_imag"]
         labels = data["labels"]
@@ -50,14 +50,16 @@ def main():
     parser.add_argument("--fft-size", type=int, default=256)
     parser.add_argument("--bins", type=int, default=128)
     parser.add_argument("--output", type=str, default=str(PROCESSED / "features.npz"))
+    parser.add_argument("--iq-path", type=str, default=str(IQ_PATH), help="Path to IQ npz (real capture or synthetic).")
     args = parser.parse_args()
 
-    iq, labels, band_ids, fft_size = load_iq(args.fft_size)
+    iq_path = pathlib.Path(args.iq_path)
+    iq, labels, band_ids, fft_size = load_iq(args.fft_size, iq_path)
     features = iq_to_features(iq, args.bins)
 
     out_path = pathlib.Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(out_path, X=features, y=labels, band_ids=band_ids, fft_size=fft_size, bins=args.bins)
+    np.savez_compressed(out_path, X=features, y=labels, band_ids=band_ids, fft_size=fft_size, bins=args.bins, iq_path=str(iq_path))
     print(f"Wrote features to {out_path} (X shape={features.shape}, labels={len(labels)})")
 
 
