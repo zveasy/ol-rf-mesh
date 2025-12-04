@@ -60,8 +60,8 @@ This document summarizes the current production-readiness criteria and remaining
 - **Dashboard (React/Next.js)**: Live RF spectrum charts, node health cards, alert list with severity, and GPS interference timeline.
 
 ## Readiness Score & Gaps
-- **Score (0–100): 50/100.** Firmware, backend, and dashboard now build and ship with smoke tests (host CMake+CTest, FastAPI pytest, Vite build). A monorepo CI workflow runs these on every push. Backend exposes health/metrics and mock data for the dashboard; firmware scaffolding exercises routing/inference paths. The core feature set is still skeletal and lacks production hardening, telemetry scale testing, and real RF/ML integration.
- 
+- **Score (0–100): 50/100.** The firmware, backend, and dashboard all build and pass smoke tests (host CMake/CTest, FastAPI pytest, Vite build) with CI coverage. The feature set is still skeletal and lacks production hardening, telemetry scale testing, and real RF/ML integration.
+
 - **Remaining work to reach the project goal:**
   - **Firmware baseline:** Target the real MCU + RF front-end with validated drivers, ADC capture, GNSS monitoring, mesh stack integration, packet codec (CBOR/protobuf), AES-256-GCM security, OTA flow, watchdog coverage, and HIL tests around drivers/mesh/OTA/faults.
   - **Mesh protocols and transport:** Implement routing state exchange, link-quality-based parent selection, retries/fragmentation, and time synchronization across nodes. Run soak/chaos tests to characterize churn, mobility, node loss, and recovery behavior.
