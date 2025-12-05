@@ -23,7 +23,13 @@ static MeshFrame make_sample(uint32_t seq) {
     f.telemetry.rf_event.model_version = 1;
     f.telemetry.gps.valid_fix = true;
     f.telemetry.health.battery_v = 3.8f;
-    f.routing.entry_count = 0;
+    f.routing.entry_count = 1;
+    f.routing.version = 42;
+    f.routing.epoch_ms = 1234;
+    f.routing.entries[0].cost = 2;
+    std::snprintf(f.routing.entries[0].neighbor_id, sizeof(f.routing.entries[0].neighbor_id), "p1");
+    f.counters.tx_counter = seq;
+    f.counters.replay_window = 0;
     return f;
 }
 
@@ -36,9 +42,13 @@ int main() {
     radio.set_receive_handler([&](const EncryptedFrame& enc) {
         MeshFrame decoded{};
         bool ok = decode_mesh_frame(enc, key, decoded);
+        (void)ok;
         assert(ok);
         assert(decoded.header.seq_no == delivered + 1);
         assert(std::string(decoded.header.dest_node_id) == std::string("gw"));
+        assert(decoded.routing.version == 42);
+        assert(decoded.routing.entry_count == 1);
+        assert(std::string(decoded.routing.entries[0].neighbor_id) == "p1");
         delivered++;
     });
 

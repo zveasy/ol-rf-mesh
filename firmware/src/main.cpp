@@ -9,6 +9,7 @@
 #include "tasks.hpp"
 #include "ota.hpp"
 #include "fault.hpp"
+#include "radio_driver.hpp"
 #include "mesh_packet.h"
 
 static void delay_ms(unsigned int /*ms*/) {
@@ -25,6 +26,8 @@ int main() {
     init_adc();
     init_sensors();
     init_mesh();
+    set_mesh_node_id(cfg.node_id.c_str());
+    init_radio_driver();
     init_model_inference();
     init_ota();
     init_fault_monitor();
@@ -37,6 +40,14 @@ int main() {
     add_route_entry(gw);
 
     uint32_t now_ms = 0;
+#ifdef OL_FREERTOS
+    // On MCU builds, hand off to FreeRTOS tasks (periodic scheduling + watchdog feed).
+    start_freertos_tasks(cfg);
+    // Should never return.
+    for (;;) {
+        delay_ms(1000);
+    }
+#else
     for (int i = 0; i < 2; ++i) {
         TaskStatus status = run_firmware_cycle(cfg, now_ms);
 
@@ -95,7 +106,8 @@ int main() {
         write_bin("gps_frame.bin", &gps, sizeof(gps));
 
         std::printf(
-            "\n[HEARTBEAT] rf=%u fft=%u gps=%u health=%u ota=%u fault=%u pkt=%u fault_active=%d\n",
+            "\n[HEARTBEAT] tx=%u rf=%u fft=%u gps=%u health=%u ota=%u fault=%u pkt=%u watchdog=%u fault_active=%d\n",
+            status.transport.last_beat_ms,
             status.rf_scan.last_beat_ms,
             status.fft.last_beat_ms,
             status.gnss.last_beat_ms,
@@ -103,12 +115,14 @@ int main() {
             status.ota.last_beat_ms,
             status.fault_monitor.last_beat_ms,
             status.packet_builder.last_beat_ms,
+            status.faults.counters.watchdog_resets,
             status.faults.fault_active ? 1 : 0
         );
 
         delay_ms(cfg.report_interval_ms);
         now_ms += cfg.report_interval_ms;
     }
+#endif
 
     return 0;
 }

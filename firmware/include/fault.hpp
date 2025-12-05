@@ -18,4 +18,5 @@ void init_fault_monitor();
 void record_fault(const char* msg);
 void record_ota_failure();
 void record_tamper();
+void record_watchdog_reset();
 FaultStatus fault_status();

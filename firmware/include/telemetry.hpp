@@ -84,6 +84,7 @@ struct RouteEntry {
 
 struct MeshRoutingPayload {
     uint32_t epoch_ms;
+    uint32_t version;
     std::array<RouteEntry, kMaxRoutes> entries;
     std::size_t entry_count;
 };
@@ -94,9 +95,15 @@ struct MeshTelemetryPayload {
     HealthStatus health;
 };
 
+struct MeshCounters {
+    uint32_t tx_counter;
+    uint32_t replay_window;
+};
+
 struct MeshFrame {
     MeshFrameHeader header;
     MeshSecurity security;
+    MeshCounters counters;
     MeshTelemetryPayload telemetry;
     MeshRoutingPayload routing;
     FaultStatus fault;

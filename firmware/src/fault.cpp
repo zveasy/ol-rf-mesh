@@ -28,6 +28,11 @@ void record_tamper() {
     record_fault("Tamper detected");
 }
 
+void record_watchdog_reset() {
+    g_fault.counters.watchdog_resets += 1;
+    record_fault("Watchdog reset");
+}
+
 FaultStatus fault_status() {
     return g_fault;
 }

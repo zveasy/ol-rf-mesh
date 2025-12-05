@@ -37,13 +37,13 @@ uint64_t siphash24(const uint8_t* data, std::size_t len, const uint8_t key[16]) 
 
     uint64_t last = static_cast<uint64_t>(len) << 56;
     switch (len % 8) {
-        case 7: last |= static_cast<uint64_t>(ptr[6]) << 48;
-        case 6: last |= static_cast<uint64_t>(ptr[5]) << 40;
-        case 5: last |= static_cast<uint64_t>(ptr[4]) << 32;
-        case 4: last |= static_cast<uint64_t>(ptr[3]) << 24;
-        case 3: last |= static_cast<uint64_t>(ptr[2]) << 16;
-        case 2: last |= static_cast<uint64_t>(ptr[1]) << 8;
-        case 1: last |= static_cast<uint64_t>(ptr[0]);
+        case 7: last |= static_cast<uint64_t>(ptr[6]) << 48; [[fallthrough]];
+        case 6: last |= static_cast<uint64_t>(ptr[5]) << 40; [[fallthrough]];
+        case 5: last |= static_cast<uint64_t>(ptr[4]) << 32; [[fallthrough]];
+        case 4: last |= static_cast<uint64_t>(ptr[3]) << 24; [[fallthrough]];
+        case 3: last |= static_cast<uint64_t>(ptr[2]) << 16; [[fallthrough]];
+        case 2: last |= static_cast<uint64_t>(ptr[1]) << 8; [[fallthrough]];
+        case 1: last |= static_cast<uint64_t>(ptr[0]); break;
         default: break;
     }
 

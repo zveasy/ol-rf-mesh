@@ -7,6 +7,7 @@
 
 // Stub inference: simulate int8 model interface by summing features and comparing to threshold.
 static float run_model_inference_stub(const std::vector<float>& features, float threshold) {
+    (void)threshold;
     if (features.empty()) return 0.0f;
     float sum = 0.0f;
     for (float v : features) {
@@ -35,6 +36,7 @@ int main() {
 
     std::vector<float> feats = load_features("../tests/feature_vector.txt");
     assert(!feats.empty());
+    (void)expected_bins;
     assert(feats.size() == expected_bins);
 
     float score = run_model_inference_stub(feats, threshold);

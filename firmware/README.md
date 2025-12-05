@@ -9,9 +9,39 @@ This repo now includes a minimal FreeRTOS-inspired scaffold to exercise the basi
 - **GNSSMonitorTask**: returns fixed GNSS metadata (valid fix, sat count, HDOP).
 - **SensorHealthTask**: returns stub battery/temp/tilt + tamper flag.
 - **PacketBuilderTask**: packages telemetry into a mesh frame and logs the send.
+- **TransportTask**: drains the mesh TX queue separately from packet formation to mirror on-device radio driver threading.
 
 Key structs live in `include/telemetry.hpp` (`RFSampleWindow`, `RFEvent`, `GpsStatus`, `HealthStatus`, `MeshFrame`).
 `src/tasks.cpp` orchestrates the sequential task execution for native builds; on-device this will map to real FreeRTOS tasks + queues.
+
+`task_plan()` exposes locked priorities/stack sizes/periods + watchdog budgets for 8 tasks (fault monitor, RF scan/ADC, FFT/TFLM, packet builder, transport, GNSS, health, OTA). `test_task_map` stress-runs the host scheduler to ensure heartbeats stay within watchdog windows.
+
+When building for the MCU (`OL_FREERTOS` defined), `start_freertos_tasks(cfg)` wires the plan into `xTaskCreate` and registers each watchdog-protected task via `watchdog.*` (ESP-IDF friendly shim). PacketBuilder now enqueues frames into a transport retry queue; `TransportTask` drains it at 4 Hz with backoff and faulting on saturation.
+
+`send_mesh_frame` can be bound to the real radio driver via `set_mesh_send_handler(MeshSendHandler)`, and returns the driver’s success status so the transport queue can retry/backoff. Host tests use the default logger or inject a failing handler (`test_mesh_send_handler`).
+
+Hardware watchdog (ESP-IDF):
+- Enable with `-DENABLE_HW_WDT=ON` (adds `OL_HW_WDT` define). CMake will fail fast if `esp_task_wdt.h` is missing.
+- `watchdog_init` uses the max per-task watchdog budget from `task_plan`; you can tighten/relax task budgets there if radio+inference sections exceed the default window.
+
+ESP-IDF app (for flashing):
+- Project at `firmware/idf` uses the same sources with an `app_main` wrapper in `idf/components/ol_rf_mesh/idf_app_main.cpp`.
+- Build/flash/monitor: 
+  ```
+  cd firmware/idf
+  cmake -S . -B build -GNinja   # or use idf.py build
+  ninja -C build                # or idf.py build
+  # flash with your port/target via idf.py flash -p <PORT>
+  ```
+  The component sets `OL_FREERTOS` and `OL_HW_WDT`; ensure `IDF_PATH` is exported before building.
+
+- Shortcut: `firmware/idf/flash_monitor.sh` wraps `idf.py -DENABLE_HW_WDT=ON` with env overrides (`ESPPORT`, `IDF_TARGET`, `ESPBAUD`). Example:
+  ```
+  ESPPORT=/dev/cu.usbserial-0001 IDF_TARGET=esp32s3 ./flash_monitor.sh
+  ```
+
+Radio driver hook:
+- `init_radio_driver()` registers a platform send handler via `set_mesh_send_handler` so the transport queue uses the radio path. Current IDF build logs TX attempts; replace `radio_driver_send` with ESP-NOW/Wi-Fi/LoRa implementation as hardware is integrated.
 
 ## Milestone 2: Packet format & mesh framing
 

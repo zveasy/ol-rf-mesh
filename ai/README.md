@@ -45,6 +45,7 @@ Artifacts:
 - `models/rf_classifier_int8.tflite`: int8 quantized classifier.
 - `models/rf_classifier_model.h`: C array + tensor arena hint.
 - `models/model_contract.json`: on-device API contract (input shape, quantization, threshold, feature stats + dataset version).
+- `scripts/benchmark_tflite.py`: measures latency for a given `.tflite` + contract; accepts `--features` to benchmark on real captures.
 
 Benchmark: `train_tflite_baseline.py` reports avg int8 inference latency on host CPU.
 
@@ -59,3 +60,24 @@ docker run --rm -v $(pwd)/models:/workspace/ai/models -v $(pwd)/data:/workspace/
 ```
 
 This runs: generate_synthetic_iq → extract_features → train_tflite_baseline (int8) and outputs `.tflite`, header, and contract under `models/`.
+
+### Running on real captures
+- Drop real IQ NPZ at `data/iq/real_capture.npz` (shape `[n, 2, fft_size]`, I/Q) or precomputed features at `data/processed/features.npz` with keys `X` (features) and `y` (labels).
+- Train and export:
+  ```
+  cd ai && source .venv/bin/activate
+  python scripts/train_tflite_baseline.py \
+    --iq-path data/iq/real_capture.npz \
+    --features-path data/processed/features.npz \
+    --dataset-version real-rf-v1 \
+    --output models/rf_classifier_int8.tflite \
+    --header models/rf_classifier_model.h \
+    --contract models/model_contract.json
+  ```
+- Benchmark latency on host CPU (int8):
+  ```
+  python scripts/benchmark_tflite.py \
+    --model models/rf_classifier_int8.tflite \
+    --contract models/model_contract.json \
+    --features data/processed/features.npz
+  ```

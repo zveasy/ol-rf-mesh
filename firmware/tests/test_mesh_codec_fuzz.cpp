@@ -7,23 +7,15 @@
 #include <random>
 #include <cstring>
 
-// Simple decode stub: for now we only validate encoding length and that encrypt returns non-zero length.
-static bool sanity_check_encode(const MeshFrame& frame, EncryptedFrame& out) {
-    AesGcmKey key{};
-    key.bytes.fill(0x22);
-    out = encrypt_mesh_frame(frame, key);
-    return out.len > 0 && out.len <= kMaxCipherLen;
-}
-
-static MeshFrame make_frame(std::mt19937& rng) {
+static MeshFrame make_frame(std::mt19937& rng, uint32_t seq) {
     std::uniform_int_distribution<int> dist_byte(0, 255);
     MeshFrame f{};
     f.header.version = 1;
     f.header.msg_type = MeshMsgType::Telemetry;
     f.header.ttl = 4;
     f.header.hop_count = 0;
-    f.header.seq_no = dist_byte(rng);
-    std::snprintf(f.header.src_node_id, sizeof(f.header.src_node_id), "node-%d", dist_byte(rng) % 50);
+    f.header.seq_no = seq;
+    std::snprintf(f.header.src_node_id, sizeof(f.header.src_node_id), "node-fuzz");
     std::snprintf(f.header.dest_node_id, sizeof(f.header.dest_node_id), "gw");
 
     f.telemetry.rf_event.timestamp_ms = dist_byte(rng);
@@ -48,18 +40,25 @@ static MeshFrame make_frame(std::mt19937& rng) {
 int main() {
     std::mt19937 rng(123);
     MockRadio radio;
+    AesGcmKey key{};
+    key.bytes.fill(0x22);
     int good = 0;
     for (int i = 0; i < 200; ++i) {
-        MeshFrame frame = make_frame(rng);
-        EncryptedFrame enc{};
-        bool ok = sanity_check_encode(frame, enc);
-        if (!ok) {
+        MeshFrame frame = make_frame(rng, static_cast<uint32_t>(i + 1));
+        EncryptedFrame enc = encrypt_mesh_frame(frame, key);
+        if (enc.len == 0 || enc.len > kMaxCipherLen) {
             return 1;
         }
         radio.transmit(enc);
-        ++good;
+        MeshFrame decoded{};
+        bool ok = decode_mesh_frame(enc, key, decoded);
+        if (!ok) {
+            return 1;
+        }
+        assert(decoded.header.seq_no == frame.header.seq_no);
+        good++;
     }
 
-    assert(radio.sent_count() == static_cast<std::size_t>(good));
-    return 0;
+    const bool counts_match = radio.sent_count() == static_cast<std::size_t>(good);
+    return counts_match ? 0 : 1;
 }

@@ -28,6 +28,7 @@ int main() {
     unsigned int received = 0;
     radio.set_receive_handler([&](const EncryptedFrame& enc) {
         // Basic property: encrypted frames should be non-zero length and carry seq_no we expect to monotonically increase.
+        (void)enc;
         assert(enc.len > 0);
         received++;
     });

@@ -32,6 +32,7 @@ int main() {
 
     MeshFrame decoded{};
     bool ok = decode_mesh_frame(enc, key, decoded);
+    (void)ok;
     assert(ok);
     assert(decoded.header.seq_no == frame.header.seq_no);
 
@@ -40,11 +41,13 @@ int main() {
     tampered.bytes[tampered.len - 1] ^= 0xFF;
     MeshFrame out_bad{};
     bool bad = decode_mesh_frame(tampered, key, out_bad);
+    (void)bad;
     assert(!bad);
 
     // Replay detection: same frame should be rejected on second decode.
     MeshFrame replay_out{};
     bool replay_ok = decode_mesh_frame(enc, key, replay_out);
+    (void)replay_ok;
     assert(!replay_ok);
 
     return 0;
